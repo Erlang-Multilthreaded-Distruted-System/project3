@@ -21,10 +21,19 @@
 %%%===================================================================
 
 start_link(Num_Nodes, Num_Requests) ->
-  gen_server:start_link({local, ?SERVER}, ?MODULE, [Num_Nodes, Num_Requests], []).
+  Node_in_ring = -1,
+  gen_server:start_link({local, ?SERVER}, ?MODULE, [Num_Nodes, Num_Requests, Node_in_ring], []).
 
-init([Num_Nodes, Num_Requests]) ->
-  {ok, [Num_Nodes, Num_Requests]}.
+init([Num_Nodes, Num_Requests, Node_in_ring]) ->
+  {ok, [Num_Nodes, Num_Requests, Node_in_ring]}.
+
+create_nodes(0, Num_Requests, Node_in_ring) ->
+  ok;
+create_nodes(Num_Nodes, Num_Requests, Node_in_ring) ->
+  Node_id = get_hash(string:concat("Node", integer_to_list(Num_Nodes))),
+  chord_node:start_link(Node_id),
+  chord_node:join(Node_id, Node_in_ring),
+  create_nodes(Num_Nodes - 1, Num_Requests, Node_id).
 
 handle_call(_Request, _From, State = #chord_server_state{}) ->
   {reply, ok, State}.
@@ -45,10 +54,10 @@ code_change(_OldVsn, State = #chord_server_state{}, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
-generate_nodes(Num_Nodes, Num_Requests, Node_in_ring) ->
+generate_nodes(Num_Nodes, Node_in_ring) ->
   Id = string:concat("chordnode", integer_to_list(Num_Nodes)),
   Hash = get_hash(Id),
-  gen_server:start_link({global, Hash}, [Hash, Num_Requests, Node_in_ring]).
+  gen_server:start_link({global, Hash}, [Hash, Node_in_ring]).
 
 
 
